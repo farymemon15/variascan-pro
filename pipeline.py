@@ -10,9 +10,24 @@ import sys
 import shutil
 import subprocess
 import time
+import types
 from pathlib import Path
 from typing import Dict, Any, Generator, Optional, List, Tuple
 from dataclasses import dataclass
+
+# Ensure root directory is in sys.path
+_ROOT = os.path.dirname(os.path.abspath(__file__))
+if _ROOT not in sys.path:
+    sys.path.insert(0, _ROOT)
+
+# Bulletproof utils fallback: works whether utils is a subfolder or uploaded flat in repo root
+if "utils" not in sys.modules:
+    try:
+        import utils
+    except ModuleNotFoundError:
+        _pkg = types.ModuleType("utils")
+        _pkg.__path__ = [_ROOT, os.path.join(_ROOT, "utils")]
+        sys.modules["utils"] = _pkg
 
 from utils.vcf_parser import VCFParser, VCFRecord
 from utils.report_generator import generate_pdf_report

@@ -13,6 +13,22 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 import importlib
+import types
+
+# Ensure root directory is in sys.path
+_ROOT = os.path.dirname(os.path.abspath(__file__))
+if _ROOT not in sys.path:
+    sys.path.insert(0, _ROOT)
+
+# Bulletproof utils fallback: works whether utils is a subfolder or uploaded flat in repo root
+if "utils" not in sys.modules:
+    try:
+        import utils
+    except ModuleNotFoundError:
+        _pkg = types.ModuleType("utils")
+        _pkg.__path__ = [_ROOT, os.path.join(_ROOT, "utils")]
+        sys.modules["utils"] = _pkg
+
 import utils.report_generator as rg_mod
 import utils.vcf_parser as vp_mod
 import utils.visualizer as vis_mod
