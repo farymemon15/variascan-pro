@@ -70,14 +70,22 @@ st.set_page_config(
     layout="wide",
 )
 
-# Initialize Admin Authentication State (Master Passcode: marooq@123)
+# Initialize Admin Authentication State (Default: False for public visitors; Master Passcode: marooq@123)
 if "is_admin" not in st.session_state:
-    st.session_state["is_admin"] = True
+    st.session_state["is_admin"] = False
 
 # Inject Custom Modern Dark-Mode CSS with Glassmorphism & Cyber-Bio Aesthetics
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@500;600;700;800;900&display=swap');
+
+    /* Hide Streamlit Default Watermarks, Menus & Footer */
+    #MainMenu {visibility: hidden; display: none !important;}
+    footer {visibility: hidden; display: none !important;}
+    header {visibility: hidden; display: none !important;}
+    div[data-testid="stDecoration"] {visibility: hidden; display: none !important;}
+    div[data-testid="stToolbar"] {visibility: hidden; display: none !important;}
+    .viewerBadge_container__1QSob {visibility: hidden; display: none !important;}
 
     /* Global Body & Background */
     .stApp {
@@ -953,7 +961,7 @@ with st.sidebar:
 
     st.markdown("---")
     with st.expander("🔐 Portal Access & Admin Controls", expanded=False):
-        if not st.session_state.get("is_admin", True):
+        if not st.session_state.get("is_admin", False):
             admin_pwd_entry = st.text_input("Enter Admin Secret Key:", type="password", key="admin_key_box", help="Master passcode unlocks unrestricted client processing mode.")
             if st.button("Unlock Admin Pro Mode", use_container_width=True, key="btn_unlock_admin"):
                 if admin_pwd_entry == "marooq@123":
@@ -1079,7 +1087,7 @@ def render_stepper(current_step: int, filter_label: str = "Indel Filter"):
 
 
 # Commercial Showcase & Admin Status Banner
-if st.session_state.get("is_admin", True):
+if st.session_state.get("is_admin", False):
     st.markdown("""
     <div style="background:linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(2, 132, 199, 0.2)); border:1.5px solid rgba(16, 185, 129, 0.45); border-radius:12px; padding:12px 18px; margin-bottom:18px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
         <div style="display:flex; align-items:center; gap:10px;">
@@ -1579,7 +1587,7 @@ if run_btn:
             min_qual=float(min_qual),
             min_depth=int(min_depth),
             force_sim=force_sim,
-            is_admin=st.session_state.get("is_admin", True),
+            is_admin=st.session_state.get("is_admin", False),
             ref_build=ref_build,
             target_gene=target_gene
         )
