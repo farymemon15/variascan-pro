@@ -36,6 +36,8 @@ class PipelineConfig:
     min_depth: int = 10
     force_sim: bool = False
     is_admin: bool = True
+    ref_build: str = "GRCh38"
+    target_gene: str = "MYBPC3"
 
 
 class ToolChecker:
@@ -495,7 +497,9 @@ class IndelPipeline:
     def _generate_outputs(self, raw_vcf_path: Path, filtered_vcf_path: Path):
         """Parse VCF and generate CSV, JSON, and PDF reports."""
         target_bp = self.config.target_deletion_bp
-        parser = VCFParser(str(filtered_vcf_path))
+        ref_build = getattr(self.config, "ref_build", "GRCh38")
+        target_gene = getattr(self.config, "target_gene", "MYBPC3")
+        parser = VCFParser(str(filtered_vcf_path), ref_build=ref_build, target_gene=target_gene)
         
         # Apply quality and depth filters if needed
         records = [
@@ -536,10 +540,21 @@ class IndelPipeline:
             "r1_sample": Path(self.config.r1_path).name,
             "r2_sample": Path(self.config.r2_path).name,
             "caller": self.config.variant_caller,
-            "total_raw_variants": len(VCFParser(str(raw_vcf_path)).records) if os.path.exists(raw_vcf_path) else len(records),
+            "total_raw_variants": len(VCFParser(str(raw_vcf_path), ref_build=ref_build, target_gene=target_gene).records) if os.path.exists(raw_vcf_path) else len(records),
+            "ref_build": ref_build,
+            "target_gene": target_gene
         }
         try:
-            generate_pdf_report(str(pdf_path), target_bp, summary_stats, df, ascii_align, is_admin=getattr(self.config, "is_admin", True))
+            generate_pdf_report(
+                str(pdf_path),
+                target_bp,
+                summary_stats,
+                df,
+                ascii_align,
+                is_admin=getattr(self.config, "is_admin", True),
+                ref_build=ref_build,
+                target_gene=target_gene
+            )
         except TypeError:
             generate_pdf_report(str(pdf_path), target_bp, summary_stats, df, ascii_align)
 
@@ -550,7 +565,9 @@ class IndelPipeline:
         csv_file = self.out_dir / "filtered_deletions.csv"
         pdf_file = self.out_dir / "filtered_deletions_report.pdf"
         
-        parser = VCFParser(str(filtered_vcf)) if filtered_vcf.exists() else None
+        ref_build = getattr(self.config, "ref_build", "GRCh38")
+        target_gene = getattr(self.config, "target_gene", "MYBPC3")
+        parser = VCFParser(str(filtered_vcf), ref_build=ref_build, target_gene=target_gene) if filtered_vcf.exists() else None
         deletions = parser.records if parser else []
 
         return {

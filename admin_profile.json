@@ -1,0 +1,24 @@
+{
+  "name": "Bioinformatics & Genomic Data Specialist",
+  "title": "Lead Computational Biologist / NGS Pipeline Architect",
+  "email": "contact@biogenomics.pro",
+  "email_active": true,
+  "upwork_url": "",
+  "upwork_active": false,
+  "fiverr_url": "",
+  "fiverr_active": false,
+  "linkedin_url": "",
+  "linkedin_active": false,
+  "github_url": "",
+  "github_active": false,
+  "whatsapp": "",
+  "whatsapp_active": false,
+  "bio": "Specialized in end-to-end Next-Generation Sequencing (NGS) pipeline development, variant calling, CRISPR off-target scoring, and clinical genomic reporting.",
+  "services": [
+    "Custom Automated NGS Pipelines (BWA-MEM, GATK4, fastp, BCFtools)",
+    "Precision Indel & SNV Annotation (ACMG/AMP 2015 Framework)",
+    "3D Protein Impact & Codon Translation Modeling",
+    "Clinical & Diagnostic PDF Report Automation",
+    "Cloud & Docker Containerized Bioinformatics Deployments"
+  ]
+}

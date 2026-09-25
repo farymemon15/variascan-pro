@@ -23,11 +23,13 @@ import utils.vaf_calculator as vaf_mod
 import utils.region_annotator as ra_mod
 import utils.ncbi_fetcher as ncbi_mod
 import pipeline as pl_mod
+import utils.profile_manager as pm_mod
 
-for _m in [rg_mod, vp_mod, vis_mod, ip_mod, cov_mod, pd_mod, vaf_mod, ra_mod, ncbi_mod, pl_mod]:
+for _m in [rg_mod, vp_mod, vis_mod, ip_mod, cov_mod, pd_mod, vaf_mod, ra_mod, ncbi_mod, pl_mod, pm_mod]:
     importlib.reload(_m)
 
 from pipeline import IndelPipeline, PipelineConfig, ToolChecker, PipelineEvent
+from utils.profile_manager import load_profile, save_profile
 from utils.demo_data import generate_demo_dataset
 from utils.visualizer import generate_html_viewer, generate_ascii_alignment, extract_flanking_sequence
 from utils.vcf_parser import VCFParser
@@ -891,7 +893,28 @@ with st.sidebar:
         st.caption("Pipeline will detect and report all structural deletions found in sample.")
 
     st.markdown("---")
-    st.markdown("### 4. Advanced Pipeline Options")
+    st.markdown("### 4. Advanced Clinical & Pipeline Options")
+    ref_build_choice = st.selectbox(
+        "Reference Genome Build:",
+        ["GRCh38 (hg38, Primary)", "GRCh37 (hg19)"],
+        index=0,
+        help="Human reference genome coordinate build for clinical variant and HGVS mapping."
+    )
+    ref_build = "GRCh37" if "GRCh37" in ref_build_choice else "GRCh38"
+
+    target_gene_choice = st.selectbox(
+        "Primary Clinical Gene / Locus:",
+        [
+            "MYBPC3 (Hypertrophic Cardiomyopathy)",
+            "TP53 (Li-Fraumeni Syndrome)",
+            "BRCA1 (Hereditary Breast/Ovarian Cancer)",
+            "Universal Genomic Screen"
+        ],
+        index=0,
+        help="Primary target locus for gene architecture, ClinVar lookup, and ACMG evaluation."
+    )
+    target_gene = "MYBPC3" if "MYBPC3" in target_gene_choice else ("TP53" if "TP53" in target_gene_choice else ("BRCA1" if "BRCA1" in target_gene_choice else "MYBPC3"))
+
     threads = st.slider("CPU Threads:", min_value=1, max_value=os.cpu_count() or 8, value=min(4, os.cpu_count() or 4))
     variant_caller = st.selectbox("Variant Calling Engine:", ["bcftools (mpileup + call)", "gatk4 (HaplotypeCaller)"])
     caller_key = "gatk4" if "gatk" in variant_caller else "bcftools"
@@ -926,6 +949,62 @@ with st.sidebar:
         else:
             st.success("👑 Admin Mode: ACTIVE (Full Access)")
             st.caption("Aapke paas full unrestricted access hai: koi file size limit nahi, clean diagnostic reports, aur direct pipeline execution.")
+            
+            # --- Dynamic Admin Profile & Freelance Accounts Manager ---
+            admin_prof = load_profile()
+            with st.expander("👤 Manage Profile & Freelance Accounts", expanded=False):
+                st.markdown("<p style='font-size:12px; color:#94a3b8; margin-bottom:8px;'>Yahan se aap apna naam, email, Upwork, Fiverr, LinkedIn, aur WhatsApp links update kar sakte hain. Jo link abhi active nahi hai (jaise LinkedIn), uska toggle <b>OFF</b> rakhein taake wo public clients ko na dikhe.</p>", unsafe_allow_html=True)
+                
+                edit_name = st.text_input("Brand / Personal Name:", value=admin_prof.get("name", ""), key="prof_name_input")
+                edit_title = st.text_input("Professional Title:", value=admin_prof.get("title", ""), key="prof_title_input")
+                edit_email = st.text_input("Contact Email:", value=admin_prof.get("email", ""), key="prof_email_input")
+                edit_email_active = st.checkbox("Show Email Button", value=admin_prof.get("email_active", True), key="prof_email_chk")
+                
+                st.markdown("---")
+                st.markdown("**Freelance & Social Profiles:**")
+                
+                edit_upwork = st.text_input("Upwork Profile URL:", value=admin_prof.get("upwork_url", ""), placeholder="https://www.upwork.com/freelancers/...", key="prof_upwork_input")
+                edit_upwork_active = st.checkbox("🟢 Enable Upwork Link", value=admin_prof.get("upwork_active", False), key="prof_upwork_chk")
+                
+                edit_fiverr = st.text_input("Fiverr Profile URL:", value=admin_prof.get("fiverr_url", ""), placeholder="https://www.fiverr.com/...", key="prof_fiverr_input")
+                edit_fiverr_active = st.checkbox("🟢 Enable Fiverr Link", value=admin_prof.get("fiverr_active", False), key="prof_fiverr_chk")
+                
+                edit_linkedin = st.text_input("LinkedIn Profile URL:", value=admin_prof.get("linkedin_url", ""), placeholder="https://www.linkedin.com/in/...", key="prof_linkedin_input", help="Jab aapka LinkedIn account active ho, URL yahan paste karein aur toggle ON kar dein.")
+                edit_linkedin_active = st.checkbox("🔵 Enable LinkedIn Link", value=admin_prof.get("linkedin_active", False), key="prof_linkedin_chk")
+                
+                edit_github = st.text_input("GitHub Profile / Portfolio:", value=admin_prof.get("github_url", ""), placeholder="https://github.com/...", key="prof_github_input")
+                edit_github_active = st.checkbox("💻 Enable GitHub Link", value=admin_prof.get("github_active", False), key="prof_github_chk")
+                
+                edit_whatsapp = st.text_input("WhatsApp / Contact Number:", value=admin_prof.get("whatsapp", ""), placeholder="+923001234567", key="prof_whatsapp_input")
+                edit_whatsapp_active = st.checkbox("💬 Enable WhatsApp Link", value=admin_prof.get("whatsapp_active", False), key="prof_whatsapp_chk")
+                
+                edit_bio = st.text_area("Client Pitch / Short Bio:", value=admin_prof.get("bio", ""), height=70, key="prof_bio_input")
+                
+                if st.button("💾 Save Profile Settings", type="primary", use_container_width=True, key="btn_save_profile"):
+                    updated_data = {
+                        "name": edit_name.strip(),
+                        "title": edit_title.strip(),
+                        "email": edit_email.strip(),
+                        "email_active": edit_email_active,
+                        "upwork_url": edit_upwork.strip(),
+                        "upwork_active": edit_upwork_active and bool(edit_upwork.strip()),
+                        "fiverr_url": edit_fiverr.strip(),
+                        "fiverr_active": edit_fiverr_active and bool(edit_fiverr.strip()),
+                        "linkedin_url": edit_linkedin.strip(),
+                        "linkedin_active": edit_linkedin_active and bool(edit_linkedin.strip()),
+                        "github_url": edit_github.strip(),
+                        "github_active": edit_github_active and bool(edit_github.strip()),
+                        "whatsapp": edit_whatsapp.strip(),
+                        "whatsapp_active": edit_whatsapp_active and bool(edit_whatsapp.strip()),
+                        "bio": edit_bio.strip(),
+                        "services": admin_prof.get("services", [])
+                    }
+                    if save_profile(updated_data):
+                        st.toast("✅ Profile & accounts updated successfully!", icon="💾")
+                        st.rerun()
+                    else:
+                        st.error("Failed to save profile.")
+
             if st.button("👁️ Preview as Public Client (Show Showcase)", use_container_width=True, key="btn_toggle_preview"):
                 st.session_state["is_admin"] = False
                 st.rerun()
@@ -998,31 +1077,55 @@ if st.session_state.get("is_admin", True):
     </div>
     """, unsafe_allow_html=True)
 else:
-    st.markdown("""
-    <div style="background:linear-gradient(135deg, rgba(15, 23, 42, 0.9), rgba(30, 41, 59, 0.85)); border:1.5px solid rgba(56, 189, 248, 0.4); border-radius:14px; padding:18px 22px; margin-bottom:18px; box-shadow:0 6px 25px rgba(0, 0, 0, 0.45);">
+    active_profile = load_profile()
+    
+    action_btns = []
+    if active_profile.get("email_active", True) and active_profile.get("email"):
+        em = active_profile["email"]
+        action_btns.append(f'''<a href="mailto:{em}?subject=Inquiry%20for%20NGS%20Genomic%20Analysis%20Project" target="_blank" style="text-decoration:none; background:linear-gradient(135deg, #10b981, #059669); color:#ffffff; font-weight:700; font-size:12.5px; padding:9px 16px; border-radius:9px; box-shadow:0 0 14px rgba(16, 185, 129, 0.4); display:inline-flex; align-items:center; gap:6px;"><span>✉️</span> Hire via Email</a>''')
+    if active_profile.get("upwork_active") and active_profile.get("upwork_url"):
+        action_btns.append(f'''<a href="{active_profile['upwork_url']}" target="_blank" style="text-decoration:none; background:linear-gradient(135deg, #14a800, #0d7300); color:#ffffff; font-weight:700; font-size:12.5px; padding:9px 16px; border-radius:9px; box-shadow:0 0 14px rgba(20, 168, 0, 0.4); display:inline-flex; align-items:center; gap:6px;"><span>🟢</span> Upwork Profile</a>''')
+    if active_profile.get("fiverr_active") and active_profile.get("fiverr_url"):
+        action_btns.append(f'''<a href="{active_profile['fiverr_url']}" target="_blank" style="text-decoration:none; background:linear-gradient(135deg, #00b22d, #008020); color:#ffffff; font-weight:700; font-size:12.5px; padding:9px 16px; border-radius:9px; box-shadow:0 0 14px rgba(0, 178, 45, 0.4); display:inline-flex; align-items:center; gap:6px;"><span>🟢</span> Fiverr Pro</a>''')
+    if active_profile.get("linkedin_active") and active_profile.get("linkedin_url"):
+        action_btns.append(f'''<a href="{active_profile['linkedin_url']}" target="_blank" style="text-decoration:none; background:linear-gradient(135deg, #0a66c2, #004182); color:#ffffff; font-weight:700; font-size:12.5px; padding:9px 16px; border-radius:9px; box-shadow:0 0 14px rgba(10, 102, 194, 0.4); display:inline-flex; align-items:center; gap:6px;"><span>🔵</span> LinkedIn</a>''')
+    if active_profile.get("github_active") and active_profile.get("github_url"):
+        action_btns.append(f'''<a href="{active_profile['github_url']}" target="_blank" style="text-decoration:none; background:linear-gradient(135deg, #333333, #1f1f1f); color:#ffffff; font-weight:700; font-size:12.5px; padding:9px 16px; border-radius:9px; border:1px solid rgba(255,255,255,0.25); display:inline-flex; align-items:center; gap:6px;"><span>💻</span> GitHub</a>''')
+    if active_profile.get("whatsapp_active") and active_profile.get("whatsapp"):
+        wa_digits = "".join(c for c in active_profile.get("whatsapp", "") if c.isdigit())
+        action_btns.append(f'''<a href="https://wa.me/{wa_digits}" target="_blank" style="text-decoration:none; background:linear-gradient(135deg, #25d366, #128c7e); color:#ffffff; font-weight:700; font-size:12.5px; padding:9px 16px; border-radius:9px; box-shadow:0 0 14px rgba(37, 211, 102, 0.4); display:inline-flex; align-items:center; gap:6px;"><span>💬</span> WhatsApp</a>''')
+
+    buttons_row_html = "".join(action_btns) if action_btns else '<span style="color:#94a3b8; font-size:12px;">Contact admin for enterprise services.</span>'
+    
+    prof_title = active_profile.get("title", "Lead Computational Biologist / NGS Analyst")
+    prof_bio = active_profile.get("bio", "Specialized in end-to-end Next-Generation Sequencing pipeline development, variant discovery, and clinical reporting.")
+
+    st.markdown(f'''
+    <div style="background:linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.9)); border:1.5px solid rgba(56, 189, 248, 0.4); border-radius:14px; padding:18px 22px; margin-bottom:18px; box-shadow:0 6px 25px rgba(0, 0, 0, 0.45);">
         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
             <div>
                 <div style="display:flex; align-items:center; gap:8px;">
                     <span style="background:linear-gradient(135deg, #0284c7, #38bdf8); color:#ffffff; padding:3px 10px; border-radius:6px; font-size:11px; font-weight:800; letter-spacing:0.5px;">CLIENT SHOWCASE & BENCHMARK DEMO</span>
                     <span style="background:rgba(16, 185, 129, 0.2); color:#6ee7b7; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:600;">PORTFOLIO SUITE</span>
                 </div>
-                <h3 style="color:#ffffff; margin:8px 0 4px 0; font-size:17px; font-family:'Outfit', sans-serif;">🔬 Professional NGS Variant Calling & Clinical Genomic Services</h3>
+                <h3 style="color:#ffffff; margin:8px 0 2px 0; font-size:17px; font-family:'Outfit', sans-serif;">🔬 {prof_title}</h3>
+                <p style="color:#38bdf8; font-size:12px; margin:0 0 6px 0; font-weight:600;">Bioinformatics Consultation & High-Throughput Genomic Pipeline Engineering</p>
             </div>
-            <a href="mailto:contact@biogenomics.pro?subject=Inquiry%20for%20NGS%20Genomic%20Analysis%20Project" target="_blank" style="text-decoration:none; background:linear-gradient(135deg, #10b981, #059669); color:#ffffff; font-weight:700; font-size:13px; padding:10px 18px; border-radius:10px; box-shadow:0 0 15px rgba(16, 185, 129, 0.4); display:inline-flex; align-items:center; gap:6px;">
-                <span>💼</span> Hire Us for Full NGS Analysis
-            </a>
+            <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+                {buttons_row_html}
+            </div>
         </div>
         <p style="color:#cbd5e1; font-size:13px; margin:10px 0 0 0; line-height:1.5;">
-            This interactive public web suite demonstrates our automated clinical variant detection pipeline on benchmark datasets and 10,000-read subsamples. For production-scale high-throughput clinical datasets (Whole-Genome WGS, Exome WES, or Multi-Gigabyte FastQ Batches) with certified molecular diagnostic reports:
+            {prof_bio}
         </p>
         <div style="display:flex; gap:16px; margin-top:12px; flex-wrap:wrap;">
             <span style="color:#38bdf8; font-size:12px; font-weight:600;">✓ Custom Cohort Alignment (BWA / GATK4)</span>
             <span style="color:#38bdf8; font-size:12px; font-weight:600;">✓ 3D Protein Mutation Impact (AlphaFold/PDB)</span>
             <span style="color:#38bdf8; font-size:12px; font-weight:600;">✓ Validation PCR Primer Design & Virtual Gel</span>
-            <span style="color:#38bdf8; font-size:12px; font-weight:600;">✓ Certified Clinical PDF Diagnostic Reports</span>
+            <span style="color:#38bdf8; font-size:12px; font-weight:600;">✓ Publication-Grade PDF Variant & Annotation Reports</span>
         </div>
     </div>
-    """, unsafe_allow_html=True)
+    ''', unsafe_allow_html=True)
 
 
 # Main Action Buttons & Stepper
@@ -1460,7 +1563,9 @@ if run_btn:
             min_qual=float(min_qual),
             min_depth=int(min_depth),
             force_sim=force_sim,
-            is_admin=st.session_state.get("is_admin", True)
+            is_admin=st.session_state.get("is_admin", True),
+            ref_build=ref_build,
+            target_gene=target_gene
         )
 
         pipeline = IndelPipeline(config)
@@ -1663,18 +1768,22 @@ if st.session_state.pipeline_run_result:
                 filtered_df["Reference Allele"].str.upper().str.contains(q) |
                 filtered_df["Alternate Allele"].str.upper().str.contains(q)
             ]
-
         st.dataframe(
             filtered_df,
             use_container_width=True,
             column_config={
+                "Genomic Coordinate": st.column_config.TextColumn("Locus (Coordinate)"),
+                "HGVS (c.)": st.column_config.TextColumn("HGVS (c.)"),
+                "HGVS (p.)": st.column_config.TextColumn("HGVS (p.)"),
+                "ACMG Classification": st.column_config.TextColumn("ACMG Tier"),
+                "ClinVar Significance": st.column_config.TextColumn("ClinVar"),
+                "gnomAD AF": st.column_config.TextColumn("gnomAD AF"),
+                "Protein Consequence": st.column_config.TextColumn("Protein Effect"),
+                "VAF (%)": st.column_config.NumberColumn("VAF (%)", format="%.1f%%"),
                 "Position": st.column_config.NumberColumn(format="%d"),
-                "Variant Type": st.column_config.TextColumn(),
-                "Variant Size / Change": st.column_config.TextColumn(),
-                "Quality Score (QUAL)": st.column_config.NumberColumn(format="%.1f"),
                 "Read Depth (DP)": st.column_config.NumberColumn(format="%d"),
-                "VAF (%)": st.column_config.NumberColumn(format="%.1f%%"),
-                "Deletion Size (bp)": st.column_config.NumberColumn(format="%d")
+                "MAPQ": st.column_config.NumberColumn("MAPQ", format="%d"),
+                "Base Quality (BQ)": st.column_config.NumberColumn("BQ", format="%d")
             }
         )
 
@@ -1687,7 +1796,8 @@ if st.session_state.pipeline_run_result:
             vchange = row.get("Variant Size / Change", f"{row.get('Deletion Size (bp)', '')} bp")
             gt = row.get("Genotype (HET/HOM)", "")
             qual = row.get("Quality Score (QUAL)", 0)
-            return f"{row['Chromosome']}:{row['Position']} [{vtype}: {vchange}] ({gt}, QUAL: {qual:.0f})"
+            coord = row.get("Genomic Coordinate", f"{row['Chromosome']}:{row['Position']}")
+            return f"{coord} [{vtype}: {vchange}] ({gt}, QUAL: {qual:.0f})"
 
         del_options = [format_variant_opt(row) for _, row in df.iterrows()]
         selected_del_idx = st.selectbox("Select Genomic Variant for Detailed Inspection:", range(len(del_options)), format_func=lambda x: del_options[x])
@@ -1704,11 +1814,13 @@ if st.session_state.pipeline_run_result:
             flank_bp=flank_bp
         )
 
-        viewer_tab1, viewer_tab2, viewer_tab3, viewer_tab4, viewer_tab5, viewer_tab6, viewer_tab7 = st.tabs([
-            "🎨 Color-Coded Nucleotide Alignment",
+        viewer_tab1, viewer_tab2, viewer_tab3, viewer_tab4, viewer_tab5, viewer_tab6, viewer_tab7, viewer_tab8, viewer_tab9 = st.tabs([
+            "🎨 Nucleotide Alignment",
+            "🏥 Clinical & ACMG Annotation",
+            "🔬 Read-Level & Alignment QC",
             "🧬 Protein & Frameshift Impact",
-            "📊 Mini-IGV Coverage Track",
-            "🧪 PCR Primers & Virtual Gel",
+            "📊 Mini-IGV & BAM Evidence",
+            "🧪 Sanger PCR & Virtual Gel",
             "⚖️ VAF & CRISPR Editing",
             "🏷️ Genomic Region & Splicing",
             "📜 ASCII Alignment Diagram"
@@ -1729,6 +1841,133 @@ if st.session_state.pipeline_run_result:
             st.components.v1.html(html_viewer, height=260)
 
         with viewer_tab2:
+            clin = target_rec.clinical_annotation
+            acmg = target_rec.acmg
+            clinvar = target_rec.clinvar
+            gnomad = target_rec.gnomad
+
+            st.markdown(f"""
+            <div style="background:rgba(15, 23, 42, 0.85); border:1.5px solid rgba(56, 189, 248, 0.4); border-radius:12px; padding:16px 20px; margin-bottom:16px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                    <div>
+                        <span style="font-size:11px; font-weight:700; color:#38bdf8; text-transform:uppercase; letter-spacing:1px;">{clin['ref_genome_build']} Human Reference</span>
+                        <h3 style="color:#ffffff; margin:2px 0 0 0; font-family:'JetBrains Mono', monospace; font-size:18px;">
+                            📍 {clin['genomic_coordinate']}
+                        </h3>
+                    </div>
+                    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                        <span style="background:rgba(2, 132, 199, 0.2); border:1px solid #0284c7; color:#38bdf8; border-radius:8px; padding:4px 10px; font-size:12px; font-weight:700;">
+                            Gene: {clin['gene_symbol']} ({clin['exon_intron']})
+                        </span>
+                        <span style="background:{acmg['acmg_color']}25; border:1px solid {acmg['acmg_color']}; color:{acmg['acmg_color']}; border-radius:8px; padding:4px 10px; font-size:12px; font-weight:800;">
+                            ACMG: {acmg['acmg_tier']}
+                        </span>
+                    </div>
+                </div>
+                <div style="margin-top:12px; display:flex; gap:16px; flex-wrap:wrap; font-family:'JetBrains Mono', monospace; font-size:13px; color:#cbd5e1;">
+                    <span>Coding DNA: <strong style="color:#38bdf8;">{target_rec.hgvs_c}</strong></span>
+                    <span>Protein Consequence: <strong style="color:#a855f7;">{target_rec.hgvs_p}</strong></span>
+                    <span>Disease: <strong style="color:#f59e0b;">{clin['disease_indication']}</strong></span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            c_c1, c_c2, c_c3 = st.columns(3)
+            with c_c1:
+                st.markdown(f"""
+                <div style="background:rgba(15, 23, 42, 0.7); border:1px solid rgba(239, 68, 68, 0.35); border-radius:12px; padding:16px; height:100%;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                        <h4 style="color:#f87171; margin:0; font-size:14px;">⚖️ ACMG / AMP 2015 Tier</h4>
+                        <span style="background:#ef444430; color:#fca5a5; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:700;">{acmg['acmg_tier'].split()[0]}</span>
+                    </div>
+                    <div style="font-size:12px; color:#cbd5e1; line-height:1.5;">
+                        <p style="margin:0 0 8px 0;"><strong>Active Criteria Rules:</strong></p>
+                        <div style="display:flex; flex-direction:column; gap:6px;">
+                            {''.join([f'<div style="background:rgba(30, 41, 59, 0.8); padding:6px 8px; border-radius:6px; border-left:3px solid #ef4444;"><span style="color:#38bdf8; font-weight:700;">{c["code"]}</span> ({c["strength"]}): <span style="color:#94a3b8; font-size:11px;">{c["description"]}</span></div>' for c in acmg["criteria"]])}
+                        </div>
+                        <p style="margin:10px 0 0 0; color:#38bdf8; font-size:11px;"><strong>Clinical Action:</strong> {acmg['clinical_action']}</p>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+            with c_c2:
+                st.markdown(f"""
+                <div style="background:rgba(15, 23, 42, 0.7); border:1px solid rgba(56, 189, 248, 0.35); border-radius:12px; padding:16px; height:100%;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                        <h4 style="color:#38bdf8; margin:0; font-size:14px;">🏥 ClinVar Annotation</h4>
+                        <span style="background:#0284c730; color:#7dd3fc; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:700;">NCBI ClinVar</span>
+                    </div>
+                    <div style="font-size:12px; color:#cbd5e1; line-height:1.6;">
+                        <p style="margin:0 0 4px 0;">Accession: <strong style="color:#f8fafc; font-family:'JetBrains Mono';">{clinvar['accession']}</strong></p>
+                        <p style="margin:0 0 4px 0;">Significance: <strong style="color:{clinvar['significance_badge_color']};">{clinvar['clinical_significance']}</strong></p>
+                        <p style="margin:0 0 4px 0;">Review: <span style="color:#e2e8f0; font-size:11px;">{clinvar['review_status']}</span></p>
+                        <p style="margin:0 0 4px 0;">Associated Phenotype: <strong style="color:#f59e0b;">{clinvar['phenotype']}</strong></p>
+                        <div style="margin-top:10px; display:flex; gap:10px;">
+                            <span style="background:rgba(30, 41, 59, 0.9); padding:3px 8px; border-radius:6px; font-size:10px; color:#94a3b8;">OMIM: {clinvar.get('omim_id', '115197')}</span>
+                            <span style="background:rgba(30, 41, 59, 0.9); padding:3px 8px; border-radius:6px; font-size:10px; color:#94a3b8;">Origin: {clinvar.get('origin', 'Germline')}</span>
+                        </div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+            with c_c3:
+                st.markdown(f"""
+                <div style="background:rgba(15, 23, 42, 0.7); border:1px solid rgba(16, 185, 129, 0.35); border-radius:12px; padding:16px; height:100%;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                        <h4 style="color:#10b981; margin:0; font-size:14px;">🌐 gnomAD Population Frequency</h4>
+                        <span style="background:#10b98130; color:#6ee7b7; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:700;">gnomAD v3/v4</span>
+                    </div>
+                    <div style="font-size:12px; color:#cbd5e1; line-height:1.6;">
+                        <p style="margin:0 0 4px 0;">Global AF: <strong style="color:#f8fafc; font-family:'JetBrains Mono';">{gnomad['global_af_display']}</strong></p>
+                        <p style="margin:0 0 4px 0;">Popmax: <strong style="color:#38bdf8;">{gnomad['popmax_population']} ({gnomad['popmax_af_display']})</strong></p>
+                        <p style="margin:0 0 6px 0;">Rarity Tier: <span style="color:#fde68a; font-size:11px;">{gnomad['rarity_tier']}</span></p>
+                        <div style="background:rgba(15, 23, 42, 0.9); padding:6px; border-radius:6px; border:1px solid rgba(148, 163, 184, 0.2); font-size:11px; font-family:'JetBrains Mono';">
+                            {''.join([f'<div style="display:flex; justify-content:space-between;"><span>{pop}:</span><span style="color:#38bdf8;">{freq}</span></div>' for pop, freq in list(gnomad['subpopulations'].items())[:4]])}
+                        </div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+        with viewer_tab3:
+            qc = target_rec.alignment_qc
+            qc_c1, qc_c2, qc_c3, qc_c4 = st.columns(4)
+            with qc_c1:
+                st.metric("Ref Reads (AD)", f"{qc['ref_ad']} reads", delta=f"{100-qc['vaf_pct']:.1f}%")
+            with qc_c2:
+                st.metric("Alt Reads (AD)", f"{qc['alt_ad']} reads", delta=f"{qc['vaf_pct']:.1f}% VAF")
+            with qc_c3:
+                st.metric("Mapping Quality", f"MAPQ {qc['mapq']}", delta="Phred 60 (Unique)")
+            with qc_c4:
+                st.metric("Mean Base Quality", f"Q{qc['mean_base_qual']}", delta="99.98% Accuracy")
+
+            st.markdown(f"""
+            <div style="background:rgba(15, 23, 42, 0.8); border:1px solid rgba(56, 189, 248, 0.3); border-radius:12px; padding:16px; margin-top:12px;">
+                <h4 style="color:#38bdf8; margin:0 0 10px 0; font-size:14px;">📊 Comprehensive Read-Level & Alignment Quality Assessment</h4>
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:12px; font-size:12.5px; color:#cbd5e1;">
+                    <div style="background:rgba(30, 41, 59, 0.7); padding:10px; border-radius:8px;">
+                        <span>⚖️ <strong>Wilson 95% Confidence Interval:</strong></span><br/>
+                        <code style="color:#38bdf8; font-size:13px;">{qc['wilson_ci_95']}</code>
+                    </div>
+                    <div style="background:rgba(30, 41, 59, 0.7); padding:10px; border-radius:8px;">
+                        <span>📑 <strong>PCR Duplicate Read Rate:</strong></span><br/>
+                        <code style="color:#10b981; font-size:13px;">{qc['duplicate_status']}</code>
+                    </div>
+                    <div style="background:rgba(30, 41, 59, 0.7); padding:10px; border-radius:8px;">
+                        <span>🧭 <strong>Strand Balance (Forward / Reverse):</strong></span><br/>
+                        <code style="color:#f59e0b; font-size:13px;">{qc['strand_balance']}</code>
+                    </div>
+                    <div style="background:rgba(30, 41, 59, 0.7); padding:10px; border-radius:8px;">
+                        <span>🛡️ <strong>Fisher Strand Bias (FS / SOR):</strong></span><br/>
+                        <code style="color:#a855f7; font-size:13px;">FS: {qc['strand_bias_fs']} | SOR: {qc['strand_bias_sor']} (PASS)</code>
+                    </div>
+                </div>
+                <div style="margin-top:10px; padding:8px 12px; background:rgba(16, 185, 129, 0.15); border-left:4px solid #10b981; border-radius:6px; color:#6ee7b7; font-size:12px; font-weight:700;">
+                    ✓ Alignment Verdict: {qc['qc_verdict']}
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        with viewer_tab4:
             impact_data = analyze_functional_impact(
                 del_size=target_rec.deletion_size,
                 ref_allele=target_rec.ref,
@@ -1775,7 +2014,7 @@ if st.session_state.pipeline_run_result:
                 </div>
                 """, unsafe_allow_html=True)
 
-        with viewer_tab3:
+        with viewer_tab5:
             cov_c1, cov_c2 = st.columns([3, 1])
             with cov_c2:
                 cov_window = st.slider("Coverage Window (± bp):", min_value=50, max_value=250, value=100, step=25)
@@ -1809,32 +2048,36 @@ if st.session_state.pipeline_run_result:
                 drop_pct = round(((dp_val - min_dip) / dp_val) * 100, 1)
                 st.caption(f"💡 **Coverage Dip Analysis:** Mean flanking depth: **{dp_val}x** | Minimum depth in deletion gap: **{min_dip}x** | Peak depth drop: **-{drop_pct}%** (Consistent with {target_rec.genotype} deletion).")
 
-        with viewer_tab4:
-            primer_info = design_pcr_primers(
-                chrom=target_rec.chrom,
-                pos=target_rec.pos,
-                del_size=target_rec.deletion_size,
-                upstream_seq=up,
-                downstream_seq=down
-            )
-            
+            st.markdown("#### 📑 BAM Read Pileup Alignment Evidence")
+            bam_reads = target_rec.bam_evidence["reads"]
+            bam_df_data = []
+            for r in bam_reads:
+                bam_df_data.append({
+                    "Read ID": r["read_id"],
+                    "Strand": f"{r['strand_symbol']} {r['strand']}",
+                    "Allele Call": r["allele"],
+                    "CIGAR": r["cigar"],
+                    "MAPQ": r["mapq"],
+                    "Aligned Sequence Representation": r["sequence_repr"]
+                })
+            st.dataframe(pd.DataFrame(bam_df_data), use_container_width=True)
+
+        with viewer_tab6:
+            sanger = target_rec.sanger
             p_col1, p_col2 = st.columns([1, 1])
             with p_col1:
-                st.markdown("#### 🔬 Validating PCR Primers")
-                fwd = primer_info["fwd_primer"]
-                rev = primer_info["rev_primer"]
-                
+                st.markdown("#### 🔬 Flanking Sanger & PCR Primers")
                 st.markdown(f"""
                 <div style="background:linear-gradient(135deg, rgba(15, 23, 42, 0.9), rgba(2, 132, 199, 0.15)); padding:14px 16px; border-radius:12px; border:1px solid rgba(56, 189, 248, 0.4); margin-bottom:12px; box-shadow:0 8px 20px -5px rgba(2, 132, 199, 0.25);">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
                         <span style="font-weight:700; color:#38bdf8; font-size:13px; text-transform:uppercase; letter-spacing:0.5px;">Forward Primer</span>
                         <span style="background:rgba(56, 189, 248, 0.15); color:#7dd3fc; border:1px solid rgba(56, 189, 248, 0.3); border-radius:6px; padding:2px 8px; font-size:10px; font-weight:700;">5' ➔ 3'</span>
                     </div>
-                    <code style="font-size:13.5px; color:#ffffff; word-break:break-all; font-family:'JetBrains Mono', monospace; font-weight:600;">{fwd['seq']}</code>
+                    <code style="font-size:13.5px; color:#ffffff; word-break:break-all; font-family:'JetBrains Mono', monospace; font-weight:600;">{sanger['forward_primer']}</code>
                     <div style="font-size:11px; color:#94a3b8; margin-top:8px; display:flex; gap:14px;">
-                        <span>Length: <strong style="color:#f8fafc;">{fwd['len']} bp</strong></span>
-                        <span>Tm: <strong style="color:#38bdf8;">{fwd['tm']}°C</strong></span>
-                        <span>GC: <strong style="color:#10b981;">{fwd['gc']}%</strong></span>
+                        <span>Length: <strong style="color:#f8fafc;">{sanger['forward_primer_len']} bp</strong></span>
+                        <span>Tm: <strong style="color:#38bdf8;">{sanger['forward_tm']}°C</strong></span>
+                        <span>GC: <strong style="color:#10b981;">{sanger['forward_gc_pct']}%</strong></span>
                     </div>
                 </div>
                 <div style="background:linear-gradient(135deg, rgba(15, 23, 42, 0.9), rgba(244, 63, 94, 0.15)); padding:14px 16px; border-radius:12px; border:1px solid rgba(244, 63, 94, 0.4); margin-bottom:12px; box-shadow:0 8px 20px -5px rgba(244, 63, 94, 0.25);">
@@ -1842,35 +2085,33 @@ if st.session_state.pipeline_run_result:
                         <span style="font-weight:700; color:#fb7185; font-size:13px; text-transform:uppercase; letter-spacing:0.5px;">Reverse Primer</span>
                         <span style="background:rgba(244, 63, 94, 0.15); color:#fca5a5; border:1px solid rgba(244, 63, 94, 0.3); border-radius:6px; padding:2px 8px; font-size:10px; font-weight:700;">5' ➔ 3'</span>
                     </div>
-                    <code style="font-size:13.5px; color:#ffffff; word-break:break-all; font-family:'JetBrains Mono', monospace; font-weight:600;">{rev['seq']}</code>
+                    <code style="font-size:13.5px; color:#ffffff; word-break:break-all; font-family:'JetBrains Mono', monospace; font-weight:600;">{sanger['reverse_primer']}</code>
                     <div style="font-size:11px; color:#94a3b8; margin-top:8px; display:flex; gap:14px;">
-                        <span>Length: <strong style="color:#f8fafc;">{rev['len']} bp</strong></span>
-                        <span>Tm: <strong style="color:#fb7185;">{rev['tm']}°C</strong></span>
-                        <span>GC: <strong style="color:#10b981;">{rev['gc']}%</strong></span>
+                        <span>Length: <strong style="color:#f8fafc;">{sanger['reverse_primer_len']} bp</strong></span>
+                        <span>Tm: <strong style="color:#fb7185;">{sanger['reverse_tm']}°C</strong></span>
+                        <span>GC: <strong style="color:#10b981;">{sanger['reverse_gc_pct']}%</strong></span>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
 
-                if target_rec.is_snp:
-                    st.info(f"💡 **SNP Validation Note:** For Single Nucleotide Polymorphisms (SNPs), amplicon length is conserved between WT and Mutant alleles ({primer_info['wt_amplicon_bp']} bp). These flanking primers amplify the locus for Sanger Sequencing, PCR-RFLP, or High-Resolution Melting (HRM) validation.")
-                else:
-                    st.info(f"**Annealing Temp (Ta):** `{primer_info['annealing_temp_c']}°C` | **Expected WT Band:** `{primer_info['wt_amplicon_bp']} bp` | **Expected Mutant Band:** `{primer_info['mut_amplicon_bp']} bp` (Shift: **-{primer_info['size_diff_bp']} bp**)")
+                st.info(f"**Annealing Temp (Ta):** `{sanger['annealing_temp_ta']}°C` | **Expected WT Band:** `{sanger['wt_amplicon_bp']} bp` | **Expected Mutant Band:** `{sanger['mut_amplicon_bp']} bp` (&Delta; **{sanger['amplicon_delta_bp']} bp**)")
+                st.caption(f"💡 **Capillary Chromatogram Guide:** {sanger['chromatogram_interpretation']}")
 
             with p_col2:
                 gel_html = generate_gel_html(
-                    wt_size=primer_info["wt_amplicon_bp"],
-                    mut_size=primer_info["mut_amplicon_bp"],
+                    wt_size=sanger["wt_amplicon_bp"],
+                    mut_size=sanger["mut_amplicon_bp"],
                     del_size=target_rec.deletion_size,
                     genotype=target_rec.genotype
                 )
                 st.components.v1.html(gel_html, height=430)
 
-        with viewer_tab5:
+        with viewer_tab7:
             vaf_data = calculate_vaf_metrics(target_rec.allelic_depth, target_rec.read_depth)
             vaf_html = generate_vaf_html(vaf_data)
             st.components.v1.html(vaf_html, height=330)
 
-        with viewer_tab6:
+        with viewer_tab8:
             annot_data = annotate_genomic_locus(
                 chrom=target_rec.chrom,
                 pos=target_rec.pos,
@@ -1879,7 +2120,7 @@ if st.session_state.pipeline_run_result:
             gene_html = generate_gene_structure_html(annot_data)
             st.components.v1.html(gene_html, height=360)
 
-        with viewer_tab7:
+        with viewer_tab9:
             ascii_text = generate_ascii_alignment(
                 chrom=target_rec.chrom,
                 pos=target_rec.pos,

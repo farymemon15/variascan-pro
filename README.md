@@ -102,17 +102,32 @@ intelligent-oppenheimer/
 ├── Dockerfile                  # Containerized deployment image
 ├── .gitignore                  # Clean gitignore excluding caches and data files
 ├── README.md                   # Comprehensive documentation
+├── admin_profile.json          # Admin profile & dynamic freelance accounts config
 ├── utils/
 │   ├── __init__.py
+│   ├── clinical_annotator.py   # ACMG/AMP 2015, ClinVar, gnomAD & HGVS annotator
+│   ├── coverage_tracker.py     # Base-level depth profiling & deletion dips
 │   ├── demo_data.py            # Synthetic benchmark dataset generator
-│   ├── vcf_parser.py           # Robust VCF 4.2 parser with indel and VAF logic
+│   ├── impact_predictor.py     # Codon translation & frameshift impact engine
+│   ├── ncbi_fetcher.py         # Real-time NCBI/ENA genomic retrieval engine
+│   ├── primer_designer.py      # PCR primer design & virtual agarose gel simulator
+│   ├── profile_manager.py      # Dynamic profile persistence & account toggles
+│   ├── region_annotator.py     # Gene structure, exon/intron & splice junctions
+│   ├── report_generator.py     # Clinical-grade PDF diagnostic report generator
 │   ├── vaf_calculator.py       # Allelic depth & Wilson score CI calculator
-│   ├── report_generator.py     # Publication-grade PDF report generator (ReportLab)
-│   ├── visualizer.py           # Sequence alignment and nucleotide badge visualizer
-│   └── ncbi_fetcher.py         # Real-time NCBI/ENA genomic retrieval engine
+│   ├── vcf_parser.py           # Robust VCF 4.2 parser with indel and VAF logic
+│   └── visualizer.py           # Sequence alignment & nucleotide badge visualizer
 └── tests/
     ├── __init__.py
-    └── test_pipeline.py        # Automated test suite (31 unit tests)
+    ├── test_clinical_annotator.py
+    ├── test_coverage_tracker.py
+    ├── test_impact_predictor.py
+    ├── test_ncbi_fetcher.py
+    ├── test_pipeline.py
+    ├── test_primer_designer.py
+    ├── test_profile_manager.py
+    ├── test_region_annotator.py
+    └── test_vaf_calculator.py   # Full automated test suite (42 unit tests)
 ```
 
 ---
@@ -169,7 +184,7 @@ Your application will be live at a custom URL (e.g., `https://variascan-pro.stre
 
 ## 🧪 Automated Verification & Unit Tests
 
-Run the full automated test suite (31 passing tests covering validation, parsing, simulation, and PDF generation):
+Run the full automated test suite (42 passing tests covering clinical ACMG annotation, ClinVar/gnomAD frequencies, Sanger primers, profile management, validation, parsing, simulation, and PDF generation):
 
 ```bash
 python -m unittest discover tests -v

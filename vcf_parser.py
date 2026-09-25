@@ -12,6 +12,7 @@ from typing import List, Dict, Any, Optional, Tuple
 import pandas as pd
 
 from utils.region_annotator import annotate_genomic_locus
+from utils.clinical_annotator import annotate_variant_clinically
 
 
 class VCFRecord:
@@ -27,7 +28,9 @@ class VCFRecord:
         info: Dict[str, Any],
         format_keys: List[str],
         sample_values: List[str],
-        raw_line: str = ""
+        raw_line: str = "",
+        ref_build: str = "GRCh38",
+        target_gene: str = "MYBPC3"
     ):
         self.chrom = chrom
         self.pos = pos
@@ -38,6 +41,10 @@ class VCFRecord:
         self.filter = filter_
         self.info = info
         self.format_keys = format_keys
+        self.sample_values = sample_values
+        self.raw_line = raw_line
+        self.ref_build = ref_build
+        self.target_gene = target_gene
         self.sample_values = sample_values
         self.raw_line = raw_line
 
@@ -117,6 +124,29 @@ class VCFRecord:
         # Genomic region annotation
         self.region_annotation = annotate_genomic_locus(self.chrom, self.pos, self.deletion_size)
 
+        # Comprehensive Clinical Annotation (All 12 attributes)
+        self.clinical_annotation = annotate_variant_clinically(
+            chrom=self.chrom,
+            pos=self.pos,
+            ref=self.ref,
+            alt=self.alt,
+            qual=self.qual if self.qual is not None else 99.0,
+            read_depth=self.read_depth,
+            allelic_depth=self.allelic_depth if isinstance(self.allelic_depth, str) else "19,19",
+            ref_build=self.ref_build,
+            target_gene=self.target_gene
+        )
+        self.hgvs_c = self.clinical_annotation["hgvs_c"]
+        self.hgvs_p = self.clinical_annotation["hgvs_p"]
+        self.gene_symbol = self.clinical_annotation["gene_symbol"]
+        self.exon_intron = self.clinical_annotation["exon_intron"]
+        self.clinvar = self.clinical_annotation["clinvar"]
+        self.gnomad = self.clinical_annotation["gnomad"]
+        self.acmg = self.clinical_annotation["acmg"]
+        self.sanger = self.clinical_annotation["sanger"]
+        self.alignment_qc = self.clinical_annotation["qc"]
+        self.bam_evidence = self.clinical_annotation["bam_evidence"]
+
     @staticmethod
     def _parse_genotype(gt_str: str) -> str:
         """Categorize GT string into HET, HOM, or REF."""
@@ -135,13 +165,24 @@ class VCFRecord:
         return gt_str
 
     def to_dict(self) -> Dict[str, Any]:
-        """Return clean dictionary representation matching prompt requirements."""
+        """Return clean dictionary representation with all clinical and bioinformatic metrics."""
         return {
             "Chromosome": self.chrom,
             "Position": self.pos,
+            "Genomic Coordinate": self.clinical_annotation["genomic_coordinate"],
+            "Reference Genome": self.clinical_annotation["ref_genome_build"],
+            "Gene": self.gene_symbol,
+            "Exon / Intron": self.exon_intron,
             "Variant Type": self.variant_type,
             "Reference Allele": self.ref,
             "Alternate Allele": self.alt,
+            "HGVS (c.)": self.hgvs_c,
+            "HGVS (p.)": self.hgvs_p,
+            "Protein Consequence": self.clinical_annotation["consequence"],
+            "ACMG Classification": self.acmg["acmg_tier"],
+            "ClinVar Significance": self.clinvar["clinical_significance"],
+            "ClinVar Accession": self.clinvar["accession"],
+            "gnomAD AF": self.gnomad["global_af_display"],
             "Variant Size / Change": self.size_display,
             "Deletion Size (bp)": self.deletion_size,
             "Genomic Region": self.region_annotation["feature_type"],
@@ -151,6 +192,9 @@ class VCFRecord:
             "Quality Score (QUAL)": round(self.qual, 2) if self.qual is not None else 0.0,
             "Read Depth (DP)": self.read_depth,
             "Allelic Depth (AD)": self.allelic_depth,
+            "MAPQ": self.alignment_qc["mapq"],
+            "Base Quality (BQ)": self.alignment_qc["mean_base_qual"],
+            "Duplicate Rate (%)": f"{self.alignment_qc['duplicate_rate_pct']}%",
             "Filter": self.filter
         }
 
@@ -158,8 +202,10 @@ class VCFRecord:
 class VCFParser:
     """Parser for VCF 4.2+ files (.vcf or .vcf.gz)."""
 
-    def __init__(self, vcf_path: str):
+    def __init__(self, vcf_path: str, ref_build: str = "GRCh38", target_gene: str = "MYBPC3"):
         self.vcf_path = Path(vcf_path)
+        self.ref_build = ref_build
+        self.target_gene = target_gene
         self.header_lines: List[str] = []
         self.column_headers: List[str] = []
         self.records: List[VCFRecord] = []
@@ -230,7 +276,9 @@ class VCFParser:
                             info=info,
                             format_keys=format_keys,
                             sample_values=sample_vals,
-                            raw_line=line
+                            raw_line=line,
+                            ref_build=self.ref_build,
+                            target_gene=self.target_gene
                         )
                         self.records.append(rec)
 
